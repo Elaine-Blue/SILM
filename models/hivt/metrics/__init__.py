@@ -14,3 +14,5 @@
 from .ade import ADE
 from .fde import FDE
 from .mr import MR
+from .wsade import WSADE
+from .wsfde import WSFDE

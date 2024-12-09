@@ -34,7 +34,7 @@ To download the full dataset(~1TB), you can download the dataset using the follo
 cd Demo
 bash download_av2_data.sh
 ```
-For simply evaluating the model, you can download the mini-versiobn raw and processed dataset from [Google Drive](https://drive.google.com/file/d/1z4j8j7qf8t7q6y4j8q7t8j7q/view?usp=sharing) and unzip it to the `SILM/data/av2` folder.
+For simply evaluating the model, you can download the mini-versiobn raw and processed dataset from [Google Drive](https://drive.google.com/drive/folders/1vfIjnIX83S5WqlN25ptcSAP1lYo_Hjyt?usp=sharing) and unzip it to the `SILM/data/av2` folder.
 Please make sure the structure of SILM is as follows:
 ```
 SILM/
@@ -45,7 +45,11 @@ SILM/
 │   ├── av2/
 │   │   ├── train/
 │   │   ├── val/
+│   │   ├── test/
 │   │   ├── processed/
+│   │   ├── trainval/
+│   │   |   |── av2_infos_train.pkl
+│   │   |   |── av2_infos_val.pkl
 ├── dataset/
 ├── mmdet3d/
 ├── models/

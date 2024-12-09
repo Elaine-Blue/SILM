@@ -14,6 +14,8 @@ from .hivt import SoftTargetCrossEntropyLoss
 from .hivt import ADE
 from .hivt import FDE
 from .hivt import MR
+from .hivt import WSADE
+from .hivt import WSFDE
 from .hivt import GlobalInteractor
 from .hivt import LocalEncoder
 from .hivt import MLPDecoder
@@ -42,6 +44,8 @@ class Predictor(pl.LightningModule):
                  weight_decay: float,
                  T_max: int,
                  model_type: str = 'CYCLIST',
+                 keypoints_threshold: float = 0.7,
+                 scale_factor: list = [1.0, 1.0, 1.0],
                  **kwargs) -> None:
         super(Predictor, self).__init__()
         self.save_hyperparameters()
@@ -54,7 +58,7 @@ class Predictor(pl.LightningModule):
         self.weight_decay = weight_decay
         self.T_max = T_max
         self.model_type = model_type
-        self.keypoints_threshold = 0.5
+        self.keypoints_threshold = keypoints_threshold
         self.local_encoder = LocalEncoder(historical_steps=historical_steps,
                                           node_dim=node_dim,
                                           edge_dim=edge_dim,
@@ -90,11 +94,9 @@ class Predictor(pl.LightningModule):
         self.minADE = ADE()
         self.minFDE = FDE()
         self.minMR = MR()
-
-        ###############
-        self.use_lstm = False
-        if self.use_lstm:
-            self.lstm = LSTMModel(input_dim=2, prediction_len=future_steps, k=num_modes, embedding_dim=embed_dim, num_layers=1)
+        self.WSADE = WSADE(scale_factor=scale_factor)
+        self.WSFDE = WSFDE(scale_factor=scale_factor)
+        self.use_new_metrics = True
 
     def forward(self, data):
         if self.keypoints_threshold > 0:
@@ -105,9 +107,6 @@ class Predictor(pl.LightningModule):
                                     torch.zeros_like(keypoints[:, :2]))
             keypoints = keypoints.reshape(data.num_nodes, h, -1)
 
-        if self.use_lstm:
-            reg, cls = self.lstm(data['x'])
-            return reg[:, -1, :, :, :].transpose(0, 1), cls[:, -1, :]
         if self.rotate:
             rotate_mat = torch.empty(data.num_nodes, 2, 2, device=self.device)
             sin_vals = torch.sin(data['rotate_angles'])
@@ -133,7 +132,6 @@ class Predictor(pl.LightningModule):
         return y_hat, pi
 
     def training_step(self, data, batch_idx):
-        # breakpoint()
         y_hat, pi = self(data)
         reg_mask = ~data['padding_mask'][:, self.historical_steps:]
         valid_steps = reg_mask.sum(dim=-1)
@@ -149,16 +147,14 @@ class Predictor(pl.LightningModule):
         return loss
 
     def validation_step(self, data, batch_idx):
-
         y_hat, pi = self(data)
-        # breakpoint()
-        
-        if self.model_type == 'xx':
+        if self.use_new_metrics:
+            breakpoint()
             data.y = data.y[data['use_pose']==True]
             y_hat = y_hat[:, data['use_pose']==True, :, :]
             data['padding_mask'] = data['padding_mask'][data['use_pose']==True]
             data.num_nodes = data.y.shape[0]
-
+        breakpoint()
         reg_mask = ~data['padding_mask'][:, self.historical_steps:]
         l2_norm = (torch.norm(y_hat[:, :, :, : 2] - data.y, p=2, dim=-1) * reg_mask).sum(dim=-1)  # [F, N]
         best_mode = l2_norm.argmin(dim=0)
@@ -232,31 +228,9 @@ class Predictor(pl.LightningModule):
         parser.add_argument('--weight_decay', type=float, default=1e-4)
         parser.add_argument('--T_max', type=int, default=64)
         parser.add_argument('--model-type', type=str, default='PEDESTRIAN')
+        parser.add_argument('--keypoints_threshold', type=float, default=0.7)
+        parser.add_argument('--scale_factor', type=[float], default=[0.20, 0.58, 0.22])
         return parent_parser
-
-    
-
-# if __name__ == '__main__':
-#     pl.seed_everything(2022)
-
-#     parser = ArgumentParser()
-#     parser.add_argument('--root', type=str, required=True)
-#     parser.add_argument('--batch_size', type=int, default=2)
-#     parser.add_argument('--num_workers', type=int, default=0)
-#     parser.add_argument('--pin_memory', type=bool, default=True)
-#     parser.add_argument('--persistent_workers', type=bool, default=False)
-#     parser.add_argument('--gpus', type=int, default=1)
-#     parser.add_argument('--ckpt_path', type=str, required=True)
-#     args = parser.parse_args()
-
-#     trainer = pl.Trainer.from_argparse_args(args)
-#     model = Predictor.load_from_checkpoint(checkpoint_path=args.ckpt_path, parallel=True)
-#     val_dataset = ArgoverseV2Dataset(root='/root/LT3D/AV2_DATASET_ROOT/', split='train')
-#     # breakpoint()
-#     dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,
-#                             pin_memory=args.pin_memory, persistent_workers=args.persistent_workers)
-#     trainer.validate(model, dataloader)
-    
     
     
     
