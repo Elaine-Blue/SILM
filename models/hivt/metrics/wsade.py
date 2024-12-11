@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, List
 
 import torch
 from torchmetrics import Metric
@@ -32,14 +32,17 @@ class WSADE(Metric):
         self.add_state('count', default=torch.tensor(0), dist_reduce_fx='sum')
 
     def update(self,
-               pred: torch.Tensor,
-               target: torch.Tensor,
-               padding_mask: torch.Tensor) -> None:
-        valid_step_num = 30 - padding_mask.sum(dim=-1)
-        valid_step_num[valid_step_num == 0] = 1
-        ade_per_path = torch.mul(torch.norm(pred - target, p=2, dim=-1), ~padding_mask).sum(dim=-1) / valid_step_num
-        self.sum += ade_per_path.sum()
-        self.count += (ade_per_path != 0).sum()
+               pred: List[torch.Tensor],
+               target: List[torch.Tensor],
+               padding_mask: List[torch.Tensor]) -> None:
+        for i, (pred_, target_, padding_mask_) in enumerate(zip(pred, target, padding_mask)):
+            if pred_ == None:
+                continue
+            de_per_path = torch.mul(torch.norm(pred_ - target_, p=2, dim=-1), ~padding_mask_).sum(dim=-1)
+            ade_per_path = torch.where((~padding_mask_).sum(dim=-1) > 0, de_per_path / (~padding_mask_).sum(dim=-1), torch.zeros(pred_.size(0)).to(pred_.device))
+            self.sum += ade_per_path.sum() * self.scale_factor[i]
+            self.count += pred_.size(0)
 
     def compute(self) -> torch.Tensor:
+        breakpoint()
         return self.sum / self.count

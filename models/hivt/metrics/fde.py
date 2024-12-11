@@ -43,8 +43,8 @@ class FDE(Metric):
                target: torch.Tensor,
                padding_mask: torch.Tensor) -> None:
         end_index = get_last_valid_index(padding_mask)
-        self.sum += torch.mul(torch.norm(pred[torch.arange(pred.size(0)), end_index, :] - target[torch.arange(pred.size(0)), end_index, :], p=2, dim=-1), ~(end_index == 0)).sum()
-        self.count += (end_index != 0).size(0)
+        self.sum += torch.norm(pred[torch.arange(pred.size(0)), end_index, :] - target[torch.arange(pred.size(0)), end_index, :], p=2, dim=-1).sum()
+        self.count += pred.size(0)
 
     def compute(self) -> torch.Tensor:
         return self.sum / self.count

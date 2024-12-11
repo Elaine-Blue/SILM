@@ -33,11 +33,10 @@ class ADE(Metric):
                pred: torch.Tensor,
                target: torch.Tensor,
                padding_mask: torch.Tensor) -> None:
-        valid_step_num = 30 - padding_mask.sum(dim=-1)
-        valid_step_num[valid_step_num == 0] = 1
-        ade_per_path = torch.mul(torch.norm(pred - target, p=2, dim=-1), ~padding_mask).sum(dim=-1) / valid_step_num
+        de_per_path = torch.mul(torch.norm(pred - target, p=2, dim=-1), ~padding_mask).sum(dim=-1)
+        ade_per_path = torch.where((~padding_mask).sum(dim=-1) > 0, de_per_path / (~padding_mask).sum(dim=-1), torch.zeros(pred.size(0)).to(pred.device))
         self.sum += ade_per_path.sum()
-        self.count += (ade_per_path != 0).sum()
+        self.count += pred.size(0)
 
     def compute(self) -> torch.Tensor:
         return self.sum / self.count
