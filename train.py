@@ -34,7 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_epochs', type=int, default=128)
     parser.add_argument('--monitor', type=str, default='val_minFDE', choices=['val_minADE', 'val_minFDE', 'val_minMR'])
     parser.add_argument('--save_top_k', type=int, default=5)
-    parser.add_argument('--pretained_ckpt', type=str, default="./lightning_logs/version_132/checkpoints/epoch=63-step=511.ckpt")
+    parser.add_argument('--pretained_ckpt', type=str, default="")
     parser = Predictor.add_model_specific_args(parser)
     args = parser.parse_args()
 

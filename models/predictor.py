@@ -148,31 +148,36 @@ class Predictor(pl.LightningModule):
 
     def validation_step(self, data, batch_idx):
         y_hat, pi = self(data)
-        if self.use_new_metrics:
-            breakpoint()
-            data.y = data.y[data['use_pose']==True]
-            y_hat = y_hat[:, data['use_pose']==True, :, :]
-            data['padding_mask'] = data['padding_mask'][data['use_pose']==True]
-            data.num_nodes = data.y.shape[0]
-        breakpoint()
         reg_mask = ~data['padding_mask'][:, self.historical_steps:]
         l2_norm = (torch.norm(y_hat[:, :, :, : 2] - data.y, p=2, dim=-1) * reg_mask).sum(dim=-1)  # [F, N]
         best_mode = l2_norm.argmin(dim=0)
         y_hat_best = y_hat[best_mode, torch.arange(data.num_nodes)]
         reg_loss = self.reg_loss(y_hat_best[reg_mask], data.y[reg_mask])
         self.log('val_reg_loss', reg_loss, prog_bar=True, on_step=False, on_epoch=True, batch_size=1)
-        # y_hat_agent = y_hat[:, data['agent_index'], :, : 2]
-        # y_agent = data.y[data['agent_index']]
-        y_hat_ = y_hat[:, :, :, : 2]
-        fde_agents = torch.norm(y_hat_[:, :, -1, :] - data.y[:, -1, :].repeat((6, 1, 1)), p=2, dim=-1)
+
+        fde_agents = torch.norm(y_hat[:, :, -1, : 2] - data.y[:, -1, :].repeat((6, 1, 1)), p=2, dim=-1)
         best_mode_agents = fde_agents.argmin(dim=0)
-        y_hat_best_agents = y_hat_[best_mode_agents, range(data.num_nodes), :, :].squeeze(0)
+        y_hat_best_agents = y_hat[best_mode_agents, range(data.num_nodes), :, :2].squeeze(0)
         self.minADE.update(y_hat_best_agents, data.y, data.padding_mask[:, 20:])
         self.minFDE.update(y_hat_best_agents, data.y, data.padding_mask[:, 20:])
         self.minMR.update(y_hat_best_agents, data.y, data.padding_mask[:, 20:])
+
+        if self.use_new_metrics:
+            y_hat_best_agents_car, data_y_car, padding_mask_car = self.get_part_pred_results(y_hat, data, cls_id=0)
+            y_hat_best_agents_ped, data_y_ped, padding_mask_ped = self.get_part_pred_results(y_hat, data, cls_id=1)
+            y_hat_best_agents_cyc, data_y_cyc, padding_mask_cyc = self.get_part_pred_results(y_hat, data, cls_id=2)
+            y_hat_best_agents_all = [y_hat_best_agents_car, y_hat_best_agents_ped, y_hat_best_agents_cyc]
+            data_y_all = [data_y_car, data_y_ped, data_y_cyc]
+            data_padding_mask_all = [padding_mask_car, padding_mask_ped, padding_mask_cyc]
+
+            self.WSADE.update(y_hat_best_agents_all, data_y_all, data_padding_mask_all)
+            self.WSFDE.update(y_hat_best_agents_all, data_y_all, data_padding_mask_all)
+
         self.log('val_minADE', self.minADE, prog_bar=True, on_step=False, on_epoch=True, batch_size=data.num_nodes)
         self.log('val_minFDE', self.minFDE, prog_bar=True, on_step=False, on_epoch=True, batch_size=data.num_nodes)
         self.log('val_minMR', self.minMR, prog_bar=True, on_step=False, on_epoch=True, batch_size=data.num_nodes)
+        self.log('val_wsADE', self.WSADE, prog_bar=True, on_step=False, on_epoch=True, batch_size=data.num_nodes)
+        self.log('val_wsFDE', self.WSFDE, prog_bar=True, on_step=False, on_epoch=True, batch_size=data.num_nodes)
 
     def configure_optimizers(self):
         decay = set()
@@ -229,9 +234,16 @@ class Predictor(pl.LightningModule):
         parser.add_argument('--T_max', type=int, default=64)
         parser.add_argument('--model-type', type=str, default='PEDESTRIAN')
         parser.add_argument('--keypoints_threshold', type=float, default=0.7)
-        parser.add_argument('--scale_factor', type=[float], default=[0.20, 0.58, 0.22])
+        parser.add_argument('--scale_factor', type=list, default=[0.20, 0.58, 0.22])
         return parent_parser
-    
-    
-    
-        
+
+    def get_part_pred_results(self, y_hat, data, cls_id=0):
+        if (data['gt_labels']==cls_id).any() == False:
+            return [None, None, None]
+        padding_mask_part = data.padding_mask[data['gt_labels']==cls_id]
+        y_hat_part = y_hat[:, data['gt_labels']==cls_id, :, :]
+        data_y_part = data.y[data['gt_labels']==cls_id, :, :]
+        fde_agents_part = torch.norm(y_hat_part[:, :, -1, : 2] - data.y[data['gt_labels']==cls_id, -1, :].repeat((6, 1, 1)), p=2, dim=-1)
+        best_mode_agents_part = fde_agents_part.argmin(dim=0)
+        y_hat_best_agents_part = y_hat[best_mode_agents_part, range(padding_mask_part.size(0)), :, :2].squeeze(0)
+        return y_hat_best_agents_part, data_y_part, padding_mask_part[:, 20:]
