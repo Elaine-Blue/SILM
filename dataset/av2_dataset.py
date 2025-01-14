@@ -87,7 +87,7 @@ class ArgoverseV2Dataset(Dataset):
 
     @property
     def processed_dir(self) -> str:
-        return os.path.join(self.root, 'processed_larger', self.split)
+        return os.path.join(self.root, 'processed', self.split)
 
     @property
     def raw_file_names(self) -> Union[str, List[str], Tuple]:

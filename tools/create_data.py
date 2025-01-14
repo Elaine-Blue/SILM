@@ -31,7 +31,7 @@ parser.add_argument('--dataset', metavar='av2', help='name of the dataset')
 parser.add_argument(
     '--root-path',
     type=str,
-    default='./data/av2',
+    default='argoverse2 data path', # './data/av2'
     help='specify the root path of dataset')
 parser.add_argument(
     '--version',
@@ -57,7 +57,7 @@ parser.add_argument(
 parser.add_argument(
     '--out-dir',
     type=str,
-    default='/root/autodl-tmp/av2_data/trainval_test',
+    default='pkl_file_save_path', # '/root/autodl-tmp/av2_data/trainval_test'
     required=False,
     help='name of info pkl')
 parser.add_argument('--extra-tag', type=str, default='av2')
