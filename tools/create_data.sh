@@ -19,6 +19,6 @@ srun -p ${PARTITION} \
     --kill-on-bad-exit=1 \
     ${SRUN_ARGS} \
     python -u tools/create_data.py ${DATASET} \
-            --root-path ./av2_data/sensor/ \
-            --out-dir ./data/pkl_file \
+            --root-path ./data/av2/sensor/ \
+            --out-dir /root/autodl-tmp/av2_data/ \
             --extra-tag ${DATASET}
